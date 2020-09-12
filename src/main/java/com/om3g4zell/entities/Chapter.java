@@ -4,6 +4,8 @@ import java.util.List;
 
 public class Chapter {
 
+    private Manga manga;
+
     private Integer number;
 
     // Maybe we can't have this

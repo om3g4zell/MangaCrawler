@@ -1,5 +1,6 @@
 package com.om3g4zell.sites;
 
+import com.om3g4zell.entities.Chapter;
 import com.om3g4zell.entities.Manga;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -43,11 +44,27 @@ public class ScanVF extends AbstractSite{
         return mangaList;
     }
 
-    public Manga getManga(String name) {
+    @Override
+    public Manga getManga(Manga manga) {
         return null;
     }
 
-    public Manga getManga(String name, List<Integer> chapters) {
+    @Override
+    public List<Chapter> getChapters(Manga manga) {
+        List<Chapter> chapters = new ArrayList<>();
+        try {
+            Document document = Jsoup.connect(manga.getUrl()).get();
+            
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return chapters;
+    }
+
+    @Override
+    public Manga getManga(Manga manga, List<Integer> chapters) {
         return null;
     }
 }
