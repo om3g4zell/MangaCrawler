@@ -22,8 +22,10 @@ public class ScanVF extends AbstractSite{
     }
 
     public List<Manga> getMangas() {
-        // TODO split jsoup and logic
         List<Manga> mangaList = new ArrayList<>();
+        // TODO add some resilience4J
+        // TODO think about wrap http
+        // HTML helper or something like that
         try {
             Document document = Jsoup.connect(String.join("/", url, "changeMangaList?type=text")).get();
             Elements elements = document.select("li a");
@@ -45,26 +47,41 @@ public class ScanVF extends AbstractSite{
     }
 
     @Override
-    public Manga getManga(Manga manga) {
-        return null;
+    public void getManga(Manga manga) {
     }
 
     @Override
-    public List<Chapter> getChapters(Manga manga) {
-        List<Chapter> chapters = new ArrayList<>();
+    public void getChapters(Manga manga) {
         try {
             Document document = Jsoup.connect(manga.getUrl()).get();
-            
+            Elements elements = document.select("li .chapter-title-rtl");
+            List<Chapter> chapters = new ArrayList<>();
+            manga.setChapters(chapters);
+            for(Element element : elements) {
+                try {
+                    Chapter chapter = new Chapter(manga);
+                    String titleAndChapter = element.text();
 
+                    // FIXME robustness
+                    String title = titleAndChapter.substring(titleAndChapter.indexOf(":"));
+                    chapter.setName(title);
+
+                    String url = element.select("a").get(0).absUrl("href");
+                    chapter.setUrl(url);
+                    chapter.setNumber(Integer.parseInt(url.substring(url.lastIndexOf("/") + 1).replace("chapitre-", "")));
+                    chapters.add(chapter);
+
+                } catch (Exception e) {
+                    logger.error("couldn't extract chapter {}", element, e);
+                }
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-        return chapters;
     }
 
     @Override
-    public Manga getManga(Manga manga, List<Integer> chapters) {
-        return null;
+    public void getManga(Manga manga, List<Integer> chapters) {
+
     }
 }

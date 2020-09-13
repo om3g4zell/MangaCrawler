@@ -36,10 +36,6 @@ public class Manga {
 
     @Override
     public String toString() {
-        return "{" +
-                "name='" + name + '\'' +
-                ", url='" + url + '\'' +
-                ", chapters=" + chapters +
-                '}';
+        return name + ":" + url;
     }
 }
