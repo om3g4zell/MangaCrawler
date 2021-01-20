@@ -13,7 +13,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ScanVF extends AbstractSite{
+public class ScanVF extends AbstractSite {
 
     private static final Logger logger = LogManager.getLogger(ScanVF.class);
 
@@ -21,7 +21,7 @@ public class ScanVF extends AbstractSite{
         super("Scan-vf", "https://www.scan-vf.net");
     }
 
-    public List<Manga> getMangas() {
+    public List<Manga> getAvailableMangas() {
         List<Manga> mangaList = new ArrayList<>();
         // TODO add some resilience4J
         // TODO think about wrap http
@@ -29,14 +29,17 @@ public class ScanVF extends AbstractSite{
         try {
             Document document = Jsoup.connect(String.join("/", url, "changeMangaList?type=text")).get();
             Elements elements = document.select("li a");
-            for(Element element : elements) {
+            for (Element element : elements) {
                 try {
-                    Manga m = new Manga();
-                    m.setName(element.text());
-                    m.setUrl(element.absUrl("href"));
-                    mangaList.add(m);
+                    var manga = Manga.builder()
+                            .name(element.text())
+                            .url(element.absUrl("href"))
+                            .build();
+                    mangaList.add(manga);
                 } catch (Exception e) {
-                    logger.error("couldn't parse {}", element, e);
+                    logger.atError()
+                            .withThrowable(e)
+                            .log("couldn't parse {}", element);
                 }
 
             }
@@ -47,41 +50,46 @@ public class ScanVF extends AbstractSite{
     }
 
     @Override
-    public void getManga(Manga manga) {
-    }
-
-    @Override
-    public void getChapters(Manga manga) {
+    public Manga getChapters(Manga manga) {
         try {
-            Document document = Jsoup.connect(manga.getUrl()).get();
+            Document document = Jsoup.connect(manga.url()).get();
             Elements elements = document.select("li .chapter-title-rtl");
-            List<Chapter> chapters = new ArrayList<>();
-            manga.setChapters(chapters);
-            for(Element element : elements) {
+
+            var availableChapters = new ArrayList<Chapter>();
+            for (Element element : elements) {
                 try {
-                    Chapter chapter = new Chapter(manga);
-                    String titleAndChapter = element.text();
+                    var titleAndChapter = element.text();
+                    var title = titleAndChapter.substring(titleAndChapter.indexOf(":") + 1).trim();
+                    var url = element.select("a").get(0).absUrl("href");
+                    var number = url.substring(url.lastIndexOf("-") + 1);
 
-                    // FIXME robustness
-                    String title = titleAndChapter.substring(titleAndChapter.indexOf(":"));
-                    chapter.setName(title);
-
-                    String url = element.select("a").get(0).absUrl("href");
-                    chapter.setUrl(url);
-                    chapter.setNumber(Integer.parseInt(url.substring(url.lastIndexOf("/") + 1).replace("chapitre-", "")));
-                    chapters.add(chapter);
+                    var chapter = Chapter.builder()
+                            .name(title)
+                            .url(url)
+                            .number(number)
+                            .build();
+                    availableChapters.add(chapter);
 
                 } catch (Exception e) {
-                    logger.error("couldn't extract chapter {}", element, e);
+                    logger.atError()
+                            .withThrowable(e)
+                            .log("couldn't extract chapter {}", element);
                 }
             }
+            return Manga.copyOf(manga)
+                    .withChapters(availableChapters);
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.atError()
+                    .withThrowable(e)
+                    .log("Couldn't access to the site");
         }
+
+        return Manga.copyOf(manga);
     }
 
     @Override
-    public void getManga(Manga manga, List<Integer> chapters) {
-
+    public Manga getPages(List<Chapter> chapters) {
+        return null;
     }
+
 }
