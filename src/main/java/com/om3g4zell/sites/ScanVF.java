@@ -88,7 +88,35 @@ public class ScanVF extends AbstractSite {
     }
 
     @Override
-    public Manga getPages(List<Chapter> chapters) {
+    public Manga getPages(Manga manga, List<String> chapters) {
+        for (String chapterId : chapters) {
+            var maybeChapter = manga.chapters().stream()
+                    .filter(chapter -> chapter.number().equals(chapterId))
+                    .findFirst();
+            if (maybeChapter.isEmpty()) {
+                // The chapter doens't exist, we skip
+                continue;
+            }
+
+            var chapter = maybeChapter.get();
+
+            try {
+                Document document = Jsoup.connect(chapter.url()).get();
+
+                // all <img>
+                Elements elements = document.select("#all img");
+
+                for (Element e : elements) {
+                    var imageUrl = e.attr("data-src");
+                    var pageNumber = e.attr("alt").substring(e.attr("alt").lastIndexOf(" " + 1));
+                }
+            } catch (IOException e) {
+                logger.atError()
+                        .withThrowable(e)
+                        .log("Couldn't access to the site");
+            }
+
+        }
         return null;
     }
 
