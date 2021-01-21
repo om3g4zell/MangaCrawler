@@ -3,6 +3,8 @@ package com.om3g4zell.mangacrawler.sites;
 import com.om3g4zell.mangacrawler.entities.Chapter;
 import com.om3g4zell.mangacrawler.entities.Manga;
 import com.om3g4zell.mangacrawler.entities.Page;
+import me.tongfei.progressbar.ProgressBar;
+import me.tongfei.progressbar.ProgressBarStyle;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jsoup.Jsoup;
@@ -11,8 +13,11 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class ScanVF extends AbstractSite {
 
@@ -91,42 +96,47 @@ public class ScanVF extends AbstractSite {
     @Override
     public Manga getPages(Manga manga, List<String> chapters) {
 
-        var extractedChapters = new ArrayList<Chapter>();
-        for (String chapterId : chapters) {
-            var maybeChapter = manga.chapters().stream()
-                    .filter(chapter -> chapter.number().equals(chapterId))
-                    .findFirst();
-            if (maybeChapter.isEmpty()) {
-                // The chapter doens't exist, we skip
-                continue;
-            }
+        var extractedChapters = new ConcurrentLinkedQueue<Chapter>();
+        try (ProgressBar pb = new ProgressBar("construct " + manga.name() + " tree...", chapters.size(), 10, System.out, ProgressBarStyle.ASCII, "", 1, false, null, ChronoUnit.MILLIS, 0L, Duration.ZERO)) {
+            chapters.parallelStream().forEach(chapterId -> {
 
-            var chapter = maybeChapter.get();
-            var pages = new ArrayList<Page>();
-
-            try {
-                Document document = Jsoup.connect(chapter.url()).get();
-
-                // all <img>
-                Elements elements = document.select("#all img");
-
-                for (Element e : elements) {
-                    var imageUrl = e.attr("data-src");
-                    var altAttr = e.attr("alt");
-                    var pageNumber = altAttr.substring(altAttr.lastIndexOf(" ") + 1).trim();
-                    pages.add(Page.builder()
-                            .imageUrl(imageUrl.trim())
-                            .number(Integer.parseInt(pageNumber))
-                            .build());
+                var maybeChapter = manga.chapters().stream()
+                        .filter(chapter -> chapter.number().equals(chapterId))
+                        .findFirst();
+                if (maybeChapter.isEmpty()) {
+                    // The chapter doens't exist, we skip
+                    return;
                 }
-                extractedChapters.add(Chapter.copyOf(chapter).withPages(pages));
-            } catch (IOException e) {
-                logger.atError()
-                        .withThrowable(e)
-                        .log("Couldn't access to the site");
-            }
 
+                var chapter = maybeChapter.get();
+                var pages = new ArrayList<Page>();
+
+                try {
+                    Document document = Jsoup.connect(chapter.url()).get();
+
+                    // all <img>
+                    Elements elements = document.select("#all img");
+
+                    for (Element e : elements) {
+                        var imageUrl = e.attr("data-src");
+                        var altAttr = e.attr("alt");
+                        var pageNumber = altAttr.substring(altAttr.lastIndexOf(" ") + 1).trim();
+                        pages.add(Page.builder()
+                                .imageUrl(imageUrl.trim())
+                                .number(Integer.parseInt(pageNumber))
+                                .build());
+                    }
+                    extractedChapters.add(Chapter.copyOf(chapter).withPages(pages));
+                    pb.step();
+                    pb.setExtraMessage("Completed chapter " + chapterId);
+                } catch (IOException e) {
+                    logger.atError()
+                            .withThrowable(e)
+                            .log("Couldn't access to the site");
+                }
+            });
         }
+
         return Manga.copyOf(manga)
                 .withChapters(extractedChapters);
     }
