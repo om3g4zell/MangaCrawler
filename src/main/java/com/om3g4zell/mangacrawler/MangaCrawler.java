@@ -18,8 +18,8 @@ public class MangaCrawler {
         var scanVF = new ScanVF();
         var mangas = scanVF.getAvailableMangas().stream().collect(Collectors.toMap(Manga::name, manga -> manga));
         System.out.println(mangas);
-        /*var manga = scanVF.getChapters(mangas.get("Solo Leveling"));
+        var manga = scanVF.getChapters(mangas.get("Solo Leveling"));
         manga = scanVF.getPages(manga, manga.chapters().stream().map(Chapter::number).collect(Collectors.toList()));
-        Downloader.download(manga, Path.of("res"));*/
+        Downloader.download(manga, Path.of("res"));
     }
 }

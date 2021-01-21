@@ -33,10 +33,18 @@ public class Downloader {
         );
         try (ProgressBar pb = new ProgressBar("downloading " + m.name(), atomicInteger.get(), 10, System.out, ProgressBarStyle.ASCII, "", 1, false, null, ChronoUnit.SECONDS, 0L, Duration.ZERO)) {
             m.chapters().parallelStream().forEach(chapter -> {
-                var chapterPath = Paths.get(mangaPath.toString(), chapter.number() + "-" + chapter.name());
+                var chapterFolder = "unknown";
+                if(chapter.name().isBlank() || chapter.name().isEmpty()) {
+                    chapterFolder = chapter.number();
+                }
+                else {
+                    chapterFolder = String.join("-", chapter.number(), chapter.name());
+                }
+
+                var chapterPath = Paths.get(mangaPath.toString(), chapterFolder);
                 var chapterDirectory = new File(chapterPath.toString());
                 chapterDirectory.mkdirs();
-                chapter.pages().forEach(page -> {
+                chapter.pages().parallelStream().forEach(page -> {
                     try {
                         var url = page.imageUrl();
                         var extension = url.substring(url.lastIndexOf(".") + 1);
