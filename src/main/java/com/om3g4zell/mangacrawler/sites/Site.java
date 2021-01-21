@@ -1,6 +1,6 @@
-package com.om3g4zell.sites;
+package com.om3g4zell.mangacrawler.sites;
 
-import com.om3g4zell.entities.Manga;
+import com.om3g4zell.mangacrawler.entities.Manga;
 
 import java.util.List;
 

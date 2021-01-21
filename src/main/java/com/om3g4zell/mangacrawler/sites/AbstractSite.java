@@ -1,4 +1,4 @@
-package com.om3g4zell.sites;
+package com.om3g4zell.mangacrawler.sites;
 
 public abstract class AbstractSite implements Site {
 

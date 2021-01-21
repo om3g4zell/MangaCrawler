@@ -1,6 +1,6 @@
-package com.om3g4zell;
+package com.om3g4zell.mangacrawler;
 
-import com.om3g4zell.sites.ScanVF;
+import com.om3g4zell.mangacrawler.sites.ScanVF;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

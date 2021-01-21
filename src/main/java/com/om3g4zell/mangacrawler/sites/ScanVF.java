@@ -1,7 +1,8 @@
-package com.om3g4zell.sites;
+package com.om3g4zell.mangacrawler.sites;
 
-import com.om3g4zell.entities.Chapter;
-import com.om3g4zell.entities.Manga;
+import com.om3g4zell.mangacrawler.entities.Chapter;
+import com.om3g4zell.mangacrawler.entities.Manga;
+import com.om3g4zell.mangacrawler.entities.Page;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jsoup.Jsoup;
@@ -89,6 +90,8 @@ public class ScanVF extends AbstractSite {
 
     @Override
     public Manga getPages(Manga manga, List<String> chapters) {
+
+        var extractedChapters = new ArrayList<Chapter>();
         for (String chapterId : chapters) {
             var maybeChapter = manga.chapters().stream()
                     .filter(chapter -> chapter.number().equals(chapterId))
@@ -99,6 +102,7 @@ public class ScanVF extends AbstractSite {
             }
 
             var chapter = maybeChapter.get();
+            var pages = new ArrayList<Page>();
 
             try {
                 Document document = Jsoup.connect(chapter.url()).get();
@@ -108,8 +112,14 @@ public class ScanVF extends AbstractSite {
 
                 for (Element e : elements) {
                     var imageUrl = e.attr("data-src");
-                    var pageNumber = e.attr("alt").substring(e.attr("alt").lastIndexOf(" " + 1));
+                    var altAttr = e.attr("alt");
+                    var pageNumber = altAttr.substring(altAttr.lastIndexOf(" ") + 1).trim();
+                    pages.add(Page.builder()
+                            .imageUrl(imageUrl.trim())
+                            .number(Integer.parseInt(pageNumber))
+                            .build());
                 }
+                extractedChapters.add(Chapter.copyOf(chapter).withPages(pages));
             } catch (IOException e) {
                 logger.atError()
                         .withThrowable(e)
@@ -117,7 +127,8 @@ public class ScanVF extends AbstractSite {
             }
 
         }
-        return null;
+        return Manga.copyOf(manga)
+                .withChapters(extractedChapters);
     }
 
 }
