@@ -9,3 +9,5 @@ Telecharger les manga sous le format
     * chapter
         * images
 faire une commande qui permet de packager les images en pdf
+
+idea, add a json at a manga root folder to retrieve information faster

@@ -29,15 +29,13 @@ public class ScanVF extends AbstractSite {
 
     public List<Manga> getAvailableMangas() {
         List<Manga> mangaList = new ArrayList<>();
-        // TODO add some resilience4J
-        // TODO think about wrap http
-        // HTML helper or something like that
         try {
             Document document = Jsoup.connect(String.join("/", url, "changeMangaList?type=text")).get();
             Elements elements = document.select("li a");
             for (Element element : elements) {
                 try {
                     var manga = Manga.builder()
+                            .sourceWebSiteName(name)
                             .name(element.text())
                             .url(element.absUrl("href"))
                             .build();
@@ -67,7 +65,7 @@ public class ScanVF extends AbstractSite {
                     var titleAndChapter = element.text();
                     var title = titleAndChapter.substring(titleAndChapter.indexOf(":") + 1).trim();
                     var url = element.select("a").get(0).absUrl("href");
-                    var number = url.substring(url.lastIndexOf("-") + 1);
+                    var number = Double.parseDouble(url.substring(url.lastIndexOf("-") + 1));
 
                     var chapter = Chapter.builder()
                             .name(title)
@@ -83,6 +81,7 @@ public class ScanVF extends AbstractSite {
                 }
             }
             return Manga.copyOf(manga)
+                    .withSourceWebSiteName(name)
                     .withChapters(availableChapters);
         } catch (IOException e) {
             logger.atError()
@@ -94,14 +93,14 @@ public class ScanVF extends AbstractSite {
     }
 
     @Override
-    public Manga getPages(Manga manga, List<String> chapters) {
+    public Manga getPages(Manga manga, List<Double> chapters) {
 
         var extractedChapters = new ConcurrentLinkedQueue<Chapter>();
         try (ProgressBar pb = new ProgressBar("construct " + manga.name() + " tree...", chapters.size(), 10, System.out, ProgressBarStyle.ASCII, "", 1, false, null, ChronoUnit.MILLIS, 0L, Duration.ZERO)) {
             chapters.parallelStream().forEach(chapterId -> {
 
                 var maybeChapter = manga.chapters().stream()
-                        .filter(chapter -> chapter.number().equals(chapterId))
+                        .filter(chapter -> chapter.number() == chapterId)
                         .findFirst();
                 if (maybeChapter.isEmpty()) {
                     // The chapter doens't exist, we skip
@@ -138,6 +137,7 @@ public class ScanVF extends AbstractSite {
         }
 
         return Manga.copyOf(manga)
+                .withSourceWebSiteName(name)
                 .withChapters(extractedChapters);
     }
 

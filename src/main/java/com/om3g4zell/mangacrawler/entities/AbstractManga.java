@@ -7,6 +7,8 @@ import java.util.List;
 @Value.Immutable
 public abstract class AbstractManga {
 
+    abstract String sourceWebSiteName();
+
     abstract String name();
 
     abstract String url();

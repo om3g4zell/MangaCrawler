@@ -24,7 +24,7 @@ public class Downloader {
     private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/537.11";
 
     public static void download(Manga m, Path path) {
-        var mangaPath = Paths.get(path.toString(), m.name());
+        var mangaPath = Paths.get(path.toString(), m.sourceWebSiteName(), m.name());
         var atomicInteger = new AtomicInteger(0);
         m.chapters().forEach(
                 chapter -> chapter.pages().forEach(page -> {
@@ -32,13 +32,13 @@ public class Downloader {
                 })
         );
         try (ProgressBar pb = new ProgressBar("downloading " + m.name(), atomicInteger.get(), 10, System.out, ProgressBarStyle.ASCII, "", 1, false, null, ChronoUnit.SECONDS, 0L, Duration.ZERO)) {
-            m.chapters().parallelStream().forEach(chapter -> {
+            m.chapters().forEach(chapter -> {
                 var chapterFolder = "unknown";
-                if(chapter.name().isBlank() || chapter.name().isEmpty()) {
-                    chapterFolder = chapter.number();
-                }
-                else {
-                    chapterFolder = String.join("-", chapter.number(), chapter.name());
+                var chapterName = sanitizePath(chapter.name());
+                if (chapterName.isBlank() ||chapterName.isEmpty()) {
+                    chapterFolder = toPrettyString(chapter.number());
+                } else {
+                    chapterFolder = String.join("-", toPrettyString(chapter.number()), chapterName);
                 }
 
                 var chapterPath = Paths.get(mangaPath.toString(), chapterFolder);
@@ -48,7 +48,7 @@ public class Downloader {
                     try {
                         var url = page.imageUrl();
                         var extension = url.substring(url.lastIndexOf(".") + 1);
-                        var pageFile = new File(chapterPath.toString(), page.number() + "." + extension);
+                        var pageFile = new File(chapterPath.toString(), toPrettyString(page.number()) + "." + extension);
 
                         if (!pageFile.exists()) {
                             URLConnection connection = new URL(url).openConnection();
@@ -69,6 +69,17 @@ public class Downloader {
 
             });
         }
+    }
+
+    private static String toPrettyString(double number) {
+        if (number == (long) number)
+            return String.format("%d", (long) number);
+        else
+            return String.format("%s", number);
+    }
+
+    private static String sanitizePath(String name) {
+        return name.replaceAll("[\\\\/:*?\"<>|.]", "").trim();
     }
 
 }

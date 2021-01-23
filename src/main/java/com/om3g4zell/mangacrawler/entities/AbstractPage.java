@@ -5,7 +5,7 @@ import org.immutables.value.Value;
 @Value.Immutable
 public abstract class AbstractPage {
 
-    abstract int number();
+    abstract double number();
 
     abstract String imageUrl();
 }

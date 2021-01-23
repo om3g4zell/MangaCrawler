@@ -7,7 +7,7 @@ import java.util.List;
 @Value.Immutable
 public abstract class AbstractChapter {
 
-    abstract String number();
+    abstract double number();
 
     abstract String name();
 
