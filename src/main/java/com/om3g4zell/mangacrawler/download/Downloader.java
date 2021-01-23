@@ -1,5 +1,9 @@
 package com.om3g4zell.mangacrawler.download;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.om3g4zell.mangacrawler.entities.Chapter;
 import com.om3g4zell.mangacrawler.entities.Manga;
 import me.tongfei.progressbar.ProgressBar;
 import me.tongfei.progressbar.ProgressBarStyle;
@@ -7,21 +11,52 @@ import org.apache.commons.io.FileUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.File;
-import java.io.InputStream;
+import javax.annotation.Nullable;
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 public class Downloader {
 
     private static final Logger logger = LogManager.getLogger(Downloader.class);
+    private static final ObjectMapper objectMapper =  new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
     private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/537.11";
+
+    public static void saveTree(Manga m, Path path) throws IOException {
+        logger.atInfo()
+                .log("Saving tree to {}", path);
+        m = m.withChapters(m.chapters().stream().sorted(Comparator.comparing(Chapter::number)).collect(Collectors.toList()));
+        var content = objectMapper.writeValueAsString(m);
+        var fileName = String.join("-", sanitizePath(m.sourceWebSiteName()), sanitizePath(m.name()), "tree");
+        var file = new File(path.toString());
+        file.mkdirs();
+        var treefile = new File(Path.of(path.toString(), fileName).toString() + ".json");
+        FileUtils.copyInputStreamToFile(new ByteArrayInputStream(content.getBytes()), treefile );
+        logger.atInfo()
+                .log("Tree saved");
+    }
+
+    @Nullable
+    public static Manga readTree(Path path) throws IOException {
+        var file = new File(path.toString());
+        if(file.exists()) {
+            return objectMapper.readValue(file, Manga.class);
+        }
+        return null;
+    }
 
     public static void download(Manga m, Path path) {
         var mangaPath = Paths.get(path.toString(), m.sourceWebSiteName(), m.name());
@@ -50,13 +85,20 @@ public class Downloader {
                         var extension = url.substring(url.lastIndexOf(".") + 1);
                         var pageFile = new File(chapterPath.toString(), toPrettyString(page.number()) + "." + extension);
 
-                        if (!pageFile.exists()) {
-                            URLConnection connection = new URL(url).openConnection();
-                            connection
-                                    .setRequestProperty("User-Agent", USER_AGENT);
-                            connection.connect();
-                            InputStream stream = connection.getInputStream();
-                            FileUtils.copyInputStreamToFile(stream, pageFile);
+                        var isBlank = (pageFile.exists() && FileUtils.sizeOf(pageFile) == 0);
+                        if (!pageFile.exists() || isBlank) {
+                            var httpClient = HttpClient.newBuilder()
+                                    .followRedirects(HttpClient.Redirect.ALWAYS)
+                                    .build();
+                            var request = HttpRequest.newBuilder(URI.create(url))
+                                    .GET()
+                                    .build();
+                            var response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+
+                            FileUtils.copyInputStreamToFile(response.body(), pageFile);
+                            if(isBlank && FileUtils.sizeOf(pageFile) != 0) {
+                                logger.info("Has been fixed !");
+                            }
                         }
                         pb.step();
                         pb.setExtraMessage("Saved " + pageFile.toString());

@@ -11,6 +11,7 @@ import com.om3g4zell.mangacrawler.sites.exceptions.ThirdPartyCallFailedException
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -19,18 +20,19 @@ public class MangaCrawler {
 
     private static final Logger logger = LogManager.getLogger(MangaCrawler.class);
 
-    public static void main(String[] args) throws ThirdPartyCallFailedException {
-        //PdfSaver.save(Path.of("res", "Scan-vf", "Tales Of Demons And Gods"), 0);
-        //var scanVF = new ScanVF();
+    public static void main(String[] args) throws ThirdPartyCallFailedException, IOException {
+        //var site = new ScanVF();
         //var scanManga = new ScanManga();
-        var scanFr = new ScanFRCC();
+        var site = new ScanFRCC();
 
-        var mangas = scanFr.getAvailableMangas().stream().collect(Collectors.toMap(Manga::name, manga -> manga));
+        /*var mangas = site.getAvailableMangas().stream().collect(Collectors.toMap(Manga::name, manga -> manga));
         System.out.println(mangas);
-        var manga = scanFr.getChapters(mangas.get("Tales Of Demons And Gods"));
+        var manga = site.getChapters(mangas.get("Tales Of Demons And Gods"));
         System.out.println(manga);
-        manga = scanFr.getPages(manga, manga.chapters().stream().map(Chapter::number).collect(Collectors.toList()));
-        System.out.println(manga);
-        Downloader.download(manga, Path.of("res"));
+        manga = site.getPages(manga, manga.chapters().stream().map(Chapter::number).collect(Collectors.toList()));
+        System.out.println(manga);*/
+       //var manga = Downloader.readTree(Path.of("res/Scan-fr-Tales Of Demons And Gods-tree.json"));
+       //Downloader.download(manga, Path.of("res"));
+        PdfSaver.save(Path.of("res", "scan-fr", "Tales Of Demons And Gods"), 0);
     }
 }

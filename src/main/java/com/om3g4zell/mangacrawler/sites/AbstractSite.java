@@ -17,8 +17,8 @@ public abstract class AbstractSite implements Site {
     protected static final String USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/537.11";
 
     protected static final RetryConfig retryConfig = RetryConfig.custom()
-            .maxAttempts(10)
-            .waitDuration(Duration.ofSeconds(15))
+            .maxAttempts(50)
+            .waitDuration(Duration.ofSeconds(5))
             .retryExceptions(ThirdPartyCallFailedException.class)
             .build();
 

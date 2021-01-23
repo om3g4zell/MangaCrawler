@@ -5,6 +5,7 @@ import com.lowagie.text.Document;
 import com.lowagie.text.Image;
 import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfWriter;
+import com.om3g4zell.mangacrawler.download.PersonalizedProgressBar;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -26,7 +27,7 @@ public class PdfSaver {
             return;
         }
 
-        try (var pdf = new Document()) {
+        try (var pdf = new Document(); var pb = PersonalizedProgressBar.progressBar("generating pdf...", maybeFiles.length)) {
             PdfWriter.getInstance(pdf, new FileOutputStream(String.format("%s%s%s.pdf", path, File.separator, path.getFileName().toString())));
             pdf.open();
             var files = Arrays.asList(maybeFiles);
@@ -51,6 +52,7 @@ public class PdfSaver {
                                             .log("Error while generating page {} of folder {}", image, chapterFolder);
                                 }
                             });
+                            pb.step();
                         } catch (Exception e) {
                             logger.atError()
                                     .withThrowable(e)
