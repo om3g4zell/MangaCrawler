@@ -17,17 +17,28 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.stream.Collectors;
 
 public class ScanVF extends AbstractSite {
 
     private static final Logger logger = LogManager.getLogger(ScanVF.class);
 
-    public ScanVF() {
+    private static ScanVF instance = null;
+
+    public static ScanVF getInstance() {
+        if (instance == null) {
+            instance = new ScanVF();
+        }
+        return instance;
+    }
+
+    private ScanVF() {
         super("Scan-vf", "https://www.scan-vf.net");
     }
 
-    public List<Manga> getAvailableMangas() {
+    public Map<String, Manga> getAvailableMangas() {
         List<Manga> mangaList = new ArrayList<>();
         try {
             Document document = Jsoup.connect(String.join("/", url, "changeMangaList?type=text")).get();
@@ -50,7 +61,8 @@ public class ScanVF extends AbstractSite {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return mangaList;
+        return mangaList.stream()
+                .collect(Collectors.toMap(Manga::name, manga -> manga));
     }
 
     @Override
@@ -59,7 +71,7 @@ public class ScanVF extends AbstractSite {
             Document document = Jsoup.connect(manga.url()).get();
             Elements elements = document.select("li .chapter-title-rtl");
 
-            var availableChapters = new ArrayList<Chapter>();
+            var availableChapters = manga.chapters().stream().collect(Collectors.toMap(Chapter::number, chapter -> chapter));
             for (Element element : elements) {
                 try {
                     var titleAndChapter = element.text();
@@ -72,7 +84,7 @@ public class ScanVF extends AbstractSite {
                             .url(url)
                             .number(number)
                             .build();
-                    availableChapters.add(chapter);
+                    availableChapters.putIfAbsent(number, chapter);
 
                 } catch (Exception e) {
                     logger.atError()
@@ -82,7 +94,7 @@ public class ScanVF extends AbstractSite {
             }
             return Manga.copyOf(manga)
                     .withSourceWebSiteName(name)
-                    .withChapters(availableChapters);
+                    .withChapters(availableChapters.values());
         } catch (IOException e) {
             logger.atError()
                     .withThrowable(e)
@@ -93,41 +105,36 @@ public class ScanVF extends AbstractSite {
     }
 
     @Override
-    public Manga getPages(Manga manga, List<Double> chapters) {
+    public Manga getPages(Manga manga) {
 
         var extractedChapters = new ConcurrentLinkedQueue<Chapter>();
-        try (ProgressBar pb = new ProgressBar("construct " + manga.name() + " tree...", chapters.size(), 10, System.out, ProgressBarStyle.ASCII, "", 1, false, null, ChronoUnit.MILLIS, 0L, Duration.ZERO)) {
-            chapters.parallelStream().forEach(chapterId -> {
+        try (ProgressBar pb = new ProgressBar("construct " + manga.name() + " tree...", manga.chapters().size(), 10, System.out, ProgressBarStyle.ASCII, "", 1, false, null, ChronoUnit.MILLIS, 0L, Duration.ZERO)) {
+            manga.chapters().parallelStream().forEach(chapter -> {
 
-                var maybeChapter = manga.chapters().stream()
-                        .filter(chapter -> chapter.number() == chapterId)
-                        .findFirst();
-                if (maybeChapter.isEmpty()) {
-                    // The chapter doens't exist, we skip
-                    return;
-                }
-
-                var chapter = maybeChapter.get();
                 var pages = new ArrayList<Page>();
 
                 try {
-                    Document document = Jsoup.connect(chapter.url()).get();
+                    if (chapter.pages().isEmpty()) {
+                        Document document = Jsoup.connect(chapter.url()).get();
 
-                    // all <img>
-                    Elements elements = document.select("#all img");
+                        // all <img>
+                        Elements elements = document.select("#all img");
 
-                    for (Element e : elements) {
-                        var imageUrl = e.attr("data-src");
-                        var altAttr = e.attr("alt");
-                        var pageNumber = altAttr.substring(altAttr.lastIndexOf(" ") + 1).trim();
-                        pages.add(Page.builder()
-                                .imageUrl(imageUrl.trim())
-                                .number(Integer.parseInt(pageNumber))
-                                .build());
+                        for (Element e : elements) {
+                            var imageUrl = e.attr("data-src");
+                            var altAttr = e.attr("alt");
+                            var pageNumber = altAttr.substring(altAttr.lastIndexOf(" ") + 1).trim();
+                            pages.add(Page.builder()
+                                    .imageUrl(imageUrl.trim())
+                                    .number(Integer.parseInt(pageNumber))
+                                    .build());
+                        }
+                        extractedChapters.add(Chapter.copyOf(chapter).withPages(pages));
+                    } else {
+                        extractedChapters.add(Chapter.copyOf(chapter));
                     }
-                    extractedChapters.add(Chapter.copyOf(chapter).withPages(pages));
                     pb.step();
-                    pb.setExtraMessage("Completed chapter " + chapterId);
+                    pb.setExtraMessage("Completed chapter " + chapter.number());
                 } catch (IOException e) {
                     logger.atError()
                             .withThrowable(e)

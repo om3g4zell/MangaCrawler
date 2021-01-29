@@ -49,4 +49,7 @@ public abstract class AbstractSite implements Site {
         }
     }
 
+    public String getName() {
+        return name;
+    }
 }

@@ -35,23 +35,26 @@ public class Downloader {
 
     private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/537.11";
 
-    public static void saveTree(Manga m, Path path) throws IOException {
+    public static void saveTree(Manga m, Path folderName) throws IOException {
+        // TODO mutualise
+        var folderPath =  buildFolderPath(m, folderName);
         logger.atInfo()
-                .log("Saving tree to {}", path);
+                .log("Saving tree to {}", folderPath);
         m = m.withChapters(m.chapters().stream().sorted(Comparator.comparing(Chapter::number)).collect(Collectors.toList()));
         var content = objectMapper.writeValueAsString(m);
-        var fileName = String.join("-", sanitizePath(m.sourceWebSiteName()), sanitizePath(m.name()), "tree");
-        var file = new File(path.toString());
+        var fileName = String.join(".", m.name(), "json");
+        var file = new File(folderPath.toString());
         file.mkdirs();
-        var treefile = new File(Path.of(path.toString(), fileName).toString() + ".json");
+        var treefile = new File(Path.of(folderPath.toString(), fileName).toString());
         FileUtils.copyInputStreamToFile(new ByteArrayInputStream(content.getBytes()), treefile );
         logger.atInfo()
                 .log("Tree saved");
     }
 
     @Nullable
-    public static Manga readTree(Path path) throws IOException {
-        var file = new File(path.toString());
+    public static Manga readTree(Path folderName, Manga manga) throws IOException {
+        var folderPath = buildFolderPath(manga, folderName);
+        var file = new File(Path.of(folderPath.toString(), manga.name() + ".json").toString());
         if(file.exists()) {
             return objectMapper.readValue(file, Manga.class);
         }
@@ -59,7 +62,7 @@ public class Downloader {
     }
 
     public static void download(Manga m, Path path) {
-        var mangaPath = Paths.get(path.toString(), m.sourceWebSiteName(), m.name());
+        var mangaPath = buildFolderPath(m, path);
         var atomicInteger = new AtomicInteger(0);
         m.chapters().forEach(
                 chapter -> chapter.pages().forEach(page -> {
@@ -111,6 +114,10 @@ public class Downloader {
 
             });
         }
+    }
+
+    private static Path buildFolderPath(Manga manga, Path folderName) {
+        return Paths.get(folderName.toString(), manga.sourceWebSiteName(), manga.name());
     }
 
     private static String toPrettyString(double number) {

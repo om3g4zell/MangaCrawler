@@ -16,17 +16,28 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.stream.Collectors;
 
 public class ScanFRCC extends AbstractSite {
 
     private static final Logger logger = LogManager.getLogger(ScanFRCC.class);
 
-    public ScanFRCC() {
+    private static ScanFRCC instance = null;
+
+    public static ScanFRCC getInstance() {
+        if(instance == null) {
+            instance = new ScanFRCC();
+        }
+        return instance;
+    }
+
+    private ScanFRCC() {
         super("Scan-fr", "https://www.scan-fr.cc/");
     }
 
-    public List<Manga> getAvailableMangas() throws ThirdPartyCallFailedException {
+    public Map<String, Manga> getAvailableMangas() throws ThirdPartyCallFailedException {
         List<Manga> mangaList = new ArrayList<>();
 
         Document document = getDocument(String.join("/", url, "changeMangaList?type=text"));
@@ -47,7 +58,8 @@ public class ScanFRCC extends AbstractSite {
 
         }
 
-        return mangaList;
+        return mangaList.stream()
+                .collect(Collectors.toMap(Manga::name, manga -> manga));
     }
 
     @Override
@@ -56,7 +68,7 @@ public class ScanFRCC extends AbstractSite {
         Document document = getDocument(manga.url());
         Elements elements = document.select(".chapter-title-rtlrr");
 
-        var availableChapters = new ArrayList<Chapter>();
+        var availableChapters = manga.chapters().stream().collect(Collectors.toMap(Chapter::number, chapter -> chapter));
         for (Element element : elements) {
             try {
                 var title = element.select("em").text();
@@ -69,7 +81,7 @@ public class ScanFRCC extends AbstractSite {
                         .url(url)
                         .number(number)
                         .build();
-                availableChapters.add(chapter);
+                availableChapters.putIfAbsent(number, chapter);
 
             } catch (Exception e) {
                 logger.atError()
@@ -79,52 +91,43 @@ public class ScanFRCC extends AbstractSite {
         }
         return Manga.copyOf(manga)
                 .withSourceWebSiteName(name)
-                .withChapters(availableChapters);
+                .withChapters(availableChapters.values());
     }
 
     @Override
-    public Manga getPages(Manga manga, List<Double> chapters) {
+    public Manga getPages(Manga manga) {
 
         var extractedChapters = new ConcurrentLinkedQueue<Chapter>();
-        try (ProgressBar pb = new ProgressBar("construct " + manga.name() + " tree...", chapters.size(), 10, System.out, ProgressBarStyle.ASCII, "", 1, false, null, ChronoUnit.MILLIS, 0L, Duration.ZERO)) {
-            chapters.parallelStream().forEach(chapterId -> {
+        try (ProgressBar pb = new ProgressBar("construct " + manga.name() + " tree...", manga.chapters().size(), 10, System.out, ProgressBarStyle.ASCII, "", 1, false, null, ChronoUnit.MILLIS, 0L, Duration.ZERO)) {
+            manga.chapters().parallelStream().forEach(chapter -> {
 
-                var maybeChapter = manga.chapters().stream()
-                        .filter(chapter -> chapter.number() == chapterId)
-                        .findFirst();
-                if (maybeChapter.isEmpty()) {
-                    // The chapter doens't exist, we skip
-                    return;
-                }
 
-                var chapter = maybeChapter.get();
                 var pages = new ArrayList<Page>();
 
                 try {
-                    Document document = getDocument(chapter.url());
+                    if(chapter.pages().isEmpty()) {
+                        Document document = getDocument(chapter.url());
 
-                    // all <img>
-                    Elements elements = document.select("#all img");
+                        // all <img>
+                        Elements elements = document.select("#all img");
 
-                    for (Element e : elements) {
-                        var imageUrl = e.attr("data-src");
-                        var altAttr = e.attr("alt");
-                        var pageNumber = altAttr.substring(altAttr.lastIndexOf(" ") + 1).trim();
+                        for (Element e : elements) {
+                            var imageUrl = e.attr("data-src");
+                            var altAttr = e.attr("alt");
+                            var pageNumber = altAttr.substring(altAttr.lastIndexOf(" ") + 1).trim();
 
-                        // FIXME add blacklist
-                        if(imageUrl.equals("https://www.scan-fr.cc/goodplay/go.jpeg")) {
-                            pb.step();
-                            continue;
+                            pages.add(Page.builder()
+                                    .imageUrl(imageUrl.trim())
+                                    .number(Integer.parseInt(pageNumber))
+                                    .build());
                         }
-
-                        pages.add(Page.builder()
-                                .imageUrl(imageUrl.trim())
-                                .number(Integer.parseInt(pageNumber))
-                                .build());
+                        extractedChapters.add(Chapter.copyOf(chapter).withPages(pages));
                     }
-                    extractedChapters.add(Chapter.copyOf(chapter).withPages(pages));
+                    else {
+                        extractedChapters.add(Chapter.copyOf(chapter));
+                    }
                     pb.step();
-                    pb.setExtraMessage("Completed chapter " + chapterId);
+                    pb.setExtraMessage("Completed chapter " + chapter.number());
                 } catch (Exception e) {
                     logger.atError()
                             .withThrowable(e)
