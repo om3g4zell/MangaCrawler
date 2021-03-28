@@ -3,7 +3,7 @@ package com.om3g4zell.mangacrawler.entities;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.immutables.value.Value;
 
-import java.util.List;
+import java.util.Collection;
 
 @Value.Immutable
 @JsonDeserialize(as = Chapter.class)
@@ -15,5 +15,5 @@ public abstract class AbstractChapter {
 
     abstract String url();
 
-    abstract List<Page> pages();
+    abstract Collection<Page> pages();
 }

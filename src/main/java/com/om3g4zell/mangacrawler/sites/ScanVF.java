@@ -49,6 +49,7 @@ public class ScanVF extends AbstractSite {
                             .sourceWebSiteName(name)
                             .name(element.text())
                             .url(element.absUrl("href"))
+                            .chapters(new ConcurrentLinkedQueue<>())
                             .build();
                     mangaList.add(manga);
                 } catch (Exception e) {
@@ -67,47 +68,46 @@ public class ScanVF extends AbstractSite {
 
     @Override
     public Manga getChapters(Manga manga) {
-        try {
-            Document document = Jsoup.connect(manga.url()).get();
-            Elements elements = document.select("li .chapter-title-rtl");
+        Document document = getDocument(manga.url());
+        Elements elements = document.select("li .chapter-title-rtl");
 
-            var availableChapters = manga.chapters().stream().collect(Collectors.toMap(Chapter::number, chapter -> chapter));
-            for (Element element : elements) {
-                try {
-                    var titleAndChapter = element.text();
-                    var title = titleAndChapter.substring(titleAndChapter.indexOf(":") + 1).trim();
-                    var url = element.select("a").get(0).absUrl("href");
-                    var number = Double.parseDouble(url.substring(url.lastIndexOf("-") + 1));
+        var availableChapters = manga.chapters().stream().collect(Collectors.toMap(Chapter::number, chapter -> chapter));
+        for (Element element : elements) {
+            try {
+                var titleAndChapter = element.text();
+                var title = titleAndChapter.substring(titleAndChapter.indexOf(":") + 1).trim();
+                var url = element.select("a").get(0).absUrl("href");
 
-                    var chapter = Chapter.builder()
-                            .name(title)
-                            .url(url)
-                            .number(number)
-                            .build();
-                    availableChapters.putIfAbsent(number, chapter);
-
-                } catch (Exception e) {
-                    logger.atError()
-                            .withThrowable(e)
-                            .log("couldn't extract chapter {}", element);
+                var lastSegment = url.substring(url.lastIndexOf("/") + 1);
+                var chapterNumberString = DOUBLE_MATCHER.matcher(lastSegment);
+                var couldExtractChapterNumber = chapterNumberString.find();
+                if(!couldExtractChapterNumber) {
+                    throw new IllegalArgumentException("Couldn't extract chapter number" + lastSegment);
                 }
+                var number = Double.parseDouble(chapterNumberString.group());
+                var chapter = Chapter.builder()
+                        .name(title)
+                        .url(url)
+                        .number(number)
+                        .pages(new ConcurrentLinkedQueue<>())
+                        .build();
+                availableChapters.putIfAbsent(number, chapter);
+
+            } catch (Exception e) {
+                logger.atError()
+                        .withThrowable(e)
+                        .log("couldn't extract chapter {}", element);
             }
-            return Manga.copyOf(manga)
-                    .withSourceWebSiteName(name)
-                    .withChapters(availableChapters.values());
-        } catch (IOException e) {
-            logger.atError()
-                    .withThrowable(e)
-                    .log("Couldn't access to the site");
         }
 
-        return Manga.copyOf(manga);
+        manga.chapters()
+                .addAll(availableChapters.values());
+        return manga;
     }
 
     @Override
     public Manga getPages(Manga manga) {
 
-        var extractedChapters = new ConcurrentLinkedQueue<Chapter>();
         try (ProgressBar pb = new ProgressBar("construct " + manga.name() + " tree...", manga.chapters().size(), 10, System.out, ProgressBarStyle.ASCII, "", 1, false, null, ChronoUnit.MILLIS, 0L, Duration.ZERO)) {
             manga.chapters().parallelStream().forEach(chapter -> {
 
@@ -129,9 +129,8 @@ public class ScanVF extends AbstractSite {
                                     .number(Integer.parseInt(pageNumber))
                                     .build());
                         }
-                        extractedChapters.add(Chapter.copyOf(chapter).withPages(pages));
-                    } else {
-                        extractedChapters.add(Chapter.copyOf(chapter));
+                        chapter.pages()
+                                .addAll(pages);
                     }
                     pb.step();
                     pb.setExtraMessage("Completed chapter " + chapter.number());
@@ -143,9 +142,7 @@ public class ScanVF extends AbstractSite {
             });
         }
 
-        return Manga.copyOf(manga)
-                .withSourceWebSiteName(name)
-                .withChapters(extractedChapters);
+        return manga;
     }
 
 }

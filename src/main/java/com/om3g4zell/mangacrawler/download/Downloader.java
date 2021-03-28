@@ -12,11 +12,11 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import javax.annotation.Nullable;
-import java.io.*;
-import java.net.HttpURLConnection;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
-import java.net.URL;
-import java.net.URLConnection;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -25,10 +25,15 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 public class Downloader {
+
+    private Downloader() {
+        throw new IllegalStateException("Private ctor");
+    }
 
     private static final Logger logger = LogManager.getLogger(Downloader.class);
     private static final ObjectMapper objectMapper =  new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
@@ -40,7 +45,10 @@ public class Downloader {
         var folderPath =  buildFolderPath(m, folderName);
         logger.atInfo()
                 .log("Saving tree to {}", folderPath);
-        m = m.withChapters(m.chapters().stream().sorted(Comparator.comparing(Chapter::number)).collect(Collectors.toList()));
+        m = m.withChapters(m.chapters().stream()
+                .sorted(Comparator.comparing(Chapter::number))
+                .collect(Collectors.toCollection(ConcurrentLinkedQueue::new))
+        );
         var content = objectMapper.writeValueAsString(m);
         var fileName = String.join(".", m.name(), "json");
         var file = new File(folderPath.toString());
@@ -52,11 +60,18 @@ public class Downloader {
     }
 
     @Nullable
-    public static Manga readTree(Path folderName, Manga manga) throws IOException {
-        var folderPath = buildFolderPath(manga, folderName);
-        var file = new File(Path.of(folderPath.toString(), manga.name() + ".json").toString());
+    public static Manga readTree(Path folderName, String mangaName, String sourceSite) {
+        var folderPath = buildFolderPath(Manga.builder()
+                .name(mangaName)
+                .sourceWebSiteName(sourceSite)
+                .url("").build(), folderName);
+        var file = new File(Path.of(folderPath.toString(), mangaName + ".json").toString());
         if(file.exists()) {
-            return objectMapper.readValue(file, Manga.class);
+            try {
+                return objectMapper.readValue(file, Manga.class);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
         return null;
     }

@@ -9,10 +9,12 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 
 import java.time.Duration;
+import java.util.regex.Pattern;
 
 public abstract class AbstractSite implements Site {
 
-    private static final Logger logger = LogManager.getLogger(Site.class);
+    protected static final Pattern DOUBLE_MATCHER = Pattern.compile("[0-9]*\\.?[0-9]+");
+    private static final Logger logger = LogManager.getLogger(AbstractSite.class);
 
     protected static final String USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/537.11";
 
@@ -31,7 +33,7 @@ public abstract class AbstractSite implements Site {
         this.name = name;
     }
 
-    protected Document getDocument(String url) throws ThirdPartyCallFailedException {
+    protected Document getDocument(String url) {
         Retry retry = Retry.of(String.join("-", "retry", name), retryConfig);
         retry.getEventPublisher().onRetry(event -> logger.error("Couldn't access to {} let's retry", url));
         try {
@@ -49,7 +51,13 @@ public abstract class AbstractSite implements Site {
         }
     }
 
+    @Override
     public String getName() {
         return name;
+    }
+
+    @Override
+    public String getUrl() {
+        return url;
     }
 }
