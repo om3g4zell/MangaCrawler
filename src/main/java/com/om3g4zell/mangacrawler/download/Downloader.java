@@ -50,7 +50,7 @@ public class Downloader {
                 .collect(Collectors.toCollection(ConcurrentLinkedQueue::new))
         );
         var content = objectMapper.writeValueAsString(m);
-        var fileName = String.join(".", m.name(), "json");
+        var fileName = String.join(".", sanitizePath(m.name()), "json");
         var file = new File(folderPath.toString());
         file.mkdirs();
         var treefile = new File(Path.of(folderPath.toString(), fileName).toString());
@@ -64,8 +64,9 @@ public class Downloader {
         var folderPath = buildFolderPath(Manga.builder()
                 .name(mangaName)
                 .sourceWebSiteName(sourceSite)
+                .chapters(new ConcurrentLinkedQueue<>())
                 .url("").build(), folderName);
-        var file = new File(Path.of(folderPath.toString(), mangaName + ".json").toString());
+        var file = new File(Path.of(folderPath.toString(), sanitizePath(mangaName) + ".json").toString());
         if(file.exists()) {
             try {
                 return objectMapper.readValue(file, Manga.class);
@@ -132,7 +133,7 @@ public class Downloader {
     }
 
     private static Path buildFolderPath(Manga manga, Path folderName) {
-        return Paths.get(folderName.toString(), manga.sourceWebSiteName(), manga.name());
+        return Paths.get(folderName.toString(), manga.sourceWebSiteName(), sanitizePath(manga.name()));
     }
 
     private static String toPrettyString(double number) {

@@ -15,6 +15,7 @@ import org.jsoup.select.Elements;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -27,7 +28,7 @@ public class ScanFRCC extends AbstractSite {
     private static ScanFRCC instance = null;
 
     public static ScanFRCC getInstance() {
-        if(instance == null) {
+        if (instance == null) {
             instance = new ScanFRCC();
         }
         return instance;
@@ -73,6 +74,7 @@ public class ScanFRCC extends AbstractSite {
                 .stream()
                 .collect(Collectors
                         .toMap(Chapter::number, chapter -> chapter));
+        var newChapters = new HashMap<Double, Chapter>();
         for (Element element : elements) {
             try {
                 var title = element.select("em").text();
@@ -81,9 +83,9 @@ public class ScanFRCC extends AbstractSite {
 
 
                 var lastSegment = url.substring(url.lastIndexOf("/") + 1);
-                var chapterNumberString = DOUBLE_MATCHER.matcher(lastSegment);
+                var chapterNumberString = CHAPTER_MATCHER.matcher(lastSegment);
                 var couldExtractChapterNumber = chapterNumberString.find();
-                if(!couldExtractChapterNumber) {
+                if (!couldExtractChapterNumber) {
                     throw new IllegalArgumentException("Couldn't extract chapter number" + lastSegment);
                 }
                 var number = Double.parseDouble(chapterNumberString.group());
@@ -95,7 +97,9 @@ public class ScanFRCC extends AbstractSite {
                         .pages(new ConcurrentLinkedQueue<>())
                         .build();
 
-                availableChapters.putIfAbsent(number, chapter);
+                if (!availableChapters.containsKey(number)) {
+                    newChapters.put(number, chapter);
+                }
 
             } catch (Exception e) {
                 logger.atError()
@@ -104,7 +108,7 @@ public class ScanFRCC extends AbstractSite {
             }
         }
         manga.chapters()
-                .addAll(availableChapters.values());
+                .addAll(newChapters.values());
         return manga;
     }
 
@@ -117,7 +121,7 @@ public class ScanFRCC extends AbstractSite {
                 var pages = new ArrayList<Page>();
 
                 try {
-                    if(chapter.pages().isEmpty()) {
+                    if (chapter.pages().isEmpty()) {
                         Document document = getDocument(chapter.url());
 
                         // all <img>

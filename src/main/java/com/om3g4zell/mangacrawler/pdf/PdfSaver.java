@@ -6,6 +6,7 @@ import com.lowagie.text.Image;
 import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfWriter;
 import com.om3g4zell.mangacrawler.download.PersonalizedProgressBar;
+import com.om3g4zell.mangacrawler.entities.Manga;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -17,6 +18,11 @@ import java.util.Comparator;
 
 public class PdfSaver {
     private static final Logger logger = LogManager.getLogger(PdfSaver.class);
+
+
+    public static void save(Manga manga, Path root, int chapterPerBook) {
+        save(Path.of(root.toString(), manga.sourceWebSiteName(), manga.name()), chapterPerBook);
+    }
 
     public static void save(Path path, int chapterPerBook) {
         var mangaFolder = new File(path.toString());

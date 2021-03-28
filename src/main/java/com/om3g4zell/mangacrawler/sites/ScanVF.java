@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -71,7 +72,9 @@ public class ScanVF extends AbstractSite {
         Document document = getDocument(manga.url());
         Elements elements = document.select("li .chapter-title-rtl");
 
-        var availableChapters = manga.chapters().stream().collect(Collectors.toMap(Chapter::number, chapter -> chapter));
+        var availableChapters = manga.chapters().stream()
+                .collect(Collectors.toMap(Chapter::number, chapter -> chapter));
+        var newChapters = new HashMap<Double, Chapter>();
         for (Element element : elements) {
             try {
                 var titleAndChapter = element.text();
@@ -79,9 +82,9 @@ public class ScanVF extends AbstractSite {
                 var url = element.select("a").get(0).absUrl("href");
 
                 var lastSegment = url.substring(url.lastIndexOf("/") + 1);
-                var chapterNumberString = DOUBLE_MATCHER.matcher(lastSegment);
+                var chapterNumberString = CHAPTER_MATCHER.matcher(lastSegment);
                 var couldExtractChapterNumber = chapterNumberString.find();
-                if(!couldExtractChapterNumber) {
+                if (!couldExtractChapterNumber) {
                     throw new IllegalArgumentException("Couldn't extract chapter number" + lastSegment);
                 }
                 var number = Double.parseDouble(chapterNumberString.group());
@@ -91,7 +94,10 @@ public class ScanVF extends AbstractSite {
                         .number(number)
                         .pages(new ConcurrentLinkedQueue<>())
                         .build();
-                availableChapters.putIfAbsent(number, chapter);
+
+                if (!availableChapters.containsKey(number)) {
+                    newChapters.put(number, chapter);
+                }
 
             } catch (Exception e) {
                 logger.atError()
@@ -101,7 +107,7 @@ public class ScanVF extends AbstractSite {
         }
 
         manga.chapters()
-                .addAll(availableChapters.values());
+                .addAll(newChapters.values());
         return manga;
     }
 
