@@ -1,13 +1,20 @@
 # MangaCrawler
 An app that crawl manga site to generate pdf
-## TODO
 
-Utiliser picocli
+This project is using Java 11
 
-Telecharger les manga sous le format 
-* manga
-    * chapter
-        * images
-faire une commande qui permet de packager les images en pdf
+Currently you can only use it by using the main class
 
-idea, add a json at a manga root folder to retrieve information faster
+Supported features :
+* See all available mangas for a given source
+* Download all images of a manga
+* Construct pdfs of the manga
+
+
+Supported website 
+* https://www.scan-vf.net
+* https://www.scan-fr.cc/
+* https://lelscan-vf.co/
+
+to do :
+* https://www.japscan.se/
