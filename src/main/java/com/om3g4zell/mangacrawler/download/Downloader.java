@@ -133,13 +133,13 @@ public class Downloader {
                                         FileUtils.copyInputStreamToFile(stream, pageFile);
                                     }
                                     pb.step();
+                                    pb.setExtraMessage("saved " + pageFile.toString());
                                 }
                             });
                         }
-                        pb.step();
-                        pb.setExtraMessage("saved " + pageFile.toString());
-
-
+                        else {
+                            pb.step();
+                        }
                     } catch (Exception e) {
                         logger.atError()
                                 .withThrowable(e)

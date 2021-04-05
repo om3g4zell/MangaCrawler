@@ -1,7 +1,6 @@
 package com.om3g4zell.mangacrawler.pdf;
 
 import com.lowagie.text.*;
-import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfWriter;
 import com.om3g4zell.mangacrawler.download.PersonalizedProgressBar;
 import com.om3g4zell.mangacrawler.entities.Manga;
@@ -13,6 +12,8 @@ import java.io.FileOutputStream;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 public class PdfSaver {
     private static final Logger logger = LogManager.getLogger(PdfSaver.class);
@@ -31,48 +32,60 @@ public class PdfSaver {
             return;
         }
 
-        try (var pdf = new Document(); var pb = PersonalizedProgressBar.progressBar("generating pdf...", maybeFiles.length)) {
-            PdfWriter.getInstance(pdf, new FileOutputStream(String.format("%s%s%s.pdf", path, File.separator, path.getFileName().toString())));
-            pdf.open();
-            var files = Arrays.asList(maybeFiles);
-            files.stream().filter(File::isDirectory).sorted(fileComparator())
-                    .forEachOrdered(chapterFolder -> {
-                        try {
-                            var paragraph = new Paragraph("Chapter : " + chapterFolder.getName(),
-                                    FontFactory.getFont(FontFactory.COURIER_BOLDOBLIQUE, 20));
-                            paragraph.setAlignment(Element.ALIGN_CENTER);
-                            var chapter = new ChapterAutoNumber(paragraph);
-                            chapter.setNumberDepth(0);
-                            pdf.add(chapter);
-                            var maybeImages = chapterFolder.listFiles();
-                            if (maybeImages == null) {
-                                return;
-                            }
-                            var images = Arrays.asList(maybeImages);
-                            images.stream().sorted(fileComparator()).forEachOrdered(image -> {
-                                try {
-                                    Image jpg = Image.getInstance(image.getAbsolutePath());
-                                    jpg.setAbsolutePosition(0, 0);
-                                    pdf.setPageSize(jpg);
-                                    pdf.newPage();
-                                    pdf.add(jpg);
-                                } catch (Exception e) {
-                                    logger.atError()
-                                            .withThrowable(e)
-                                            .log("Error while generating page {} of folder {}", image, chapterFolder);
-                                }
-                            });
-                            pb.step();
-                        } catch (Exception e) {
-                            logger.atError()
-                                    .withThrowable(e)
-                                    .log("Error while generating chapter {}", chapterFolder);
+        final AtomicInteger counter = new AtomicInteger();
+        var tomeList = Arrays.stream(maybeFiles)
+                .filter(File::isDirectory)
+                .sorted(fileComparator())
+                .collect(Collectors.groupingBy(it -> counter.getAndIncrement() / chapterPerBook))
+                .values();
+
+        int tomeNumber = 1;
+        for (var chapters : tomeList) {
+            var pdfName = String.format("%s%s%s-Tome%s.pdf", path, File.separator, path.getFileName().toString(), tomeNumber);
+            try (var pdf = new Document();
+                 var pb = PersonalizedProgressBar.progressBar("generating pdf " + pdfName, chapters.size())) {
+                PdfWriter.getInstance(pdf, new FileOutputStream(pdfName));
+                pdf.open();
+
+                chapters.forEach(chapterFolder -> {
+                    try {
+                        var paragraph = new Paragraph("Chapter : " + chapterFolder.getName(),
+                                FontFactory.getFont(FontFactory.COURIER_BOLDOBLIQUE, 20));
+                        paragraph.setAlignment(Element.ALIGN_CENTER);
+                        var chapter = new ChapterAutoNumber(paragraph);
+                        chapter.setNumberDepth(0);
+                        pdf.add(chapter);
+                        var maybeImages = chapterFolder.listFiles();
+                        if (maybeImages == null) {
+                            return;
                         }
-                    });
-        } catch (Exception e) {
-            logger.atError()
-                    .withThrowable(e)
-                    .log("Error while generating pdf");
+                        var images = Arrays.asList(maybeImages);
+                        images.stream().sorted(fileComparator()).forEachOrdered(image -> {
+                            try {
+                                Image jpg = Image.getInstance(image.getAbsolutePath());
+                                jpg.setAbsolutePosition(0, 0);
+                                pdf.setPageSize(jpg);
+                                pdf.newPage();
+                                pdf.add(jpg);
+                            } catch (Exception e) {
+                                logger.atError()
+                                        .withThrowable(e)
+                                        .log("Error while generating page {} of folder {}", image, chapterFolder);
+                            }
+                        });
+                        pb.step();
+                    } catch (Exception e) {
+                        logger.atError()
+                                .withThrowable(e)
+                                .log("Error while generating chapter {}", chapterFolder);
+                    }
+                });
+            } catch (Exception e) {
+                logger.atError()
+                        .withThrowable(e)
+                        .log("Error while generating pdf " + pdfName);
+            }
+            tomeNumber++;
         }
     }
 

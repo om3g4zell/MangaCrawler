@@ -25,8 +25,8 @@ public class MangaCrawler {
 
     public static void main(String[] args) throws ThirdPartyCallFailedException, IOException, InterruptedException {
 
-        var site = LelScanVF.getInstance();
-        getOrUpdateManga(site, "Solo Leveling", true, false, ROOT_PATH);
+        var site = ScanVF.getInstance();
+        getOrUpdateManga(site, "Solo Leveling", true, true, ROOT_PATH);
         //updateRoot(ROOT_PATH, site, true, true);
         //getOrUpdateManga(site, "Solo Leveling", false, true, ROOT_PATH);
 
@@ -51,7 +51,7 @@ public class MangaCrawler {
         }
 
         if (makePdf) {
-            PdfSaver.save(manga, rootPath, 0);
+            PdfSaver.save(manga, rootPath, 10);
         }
     }
 
