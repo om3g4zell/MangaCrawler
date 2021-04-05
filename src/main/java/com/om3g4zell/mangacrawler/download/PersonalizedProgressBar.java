@@ -11,7 +11,8 @@ public class PersonalizedProgressBar {
         return builder.setTaskName(name)
                 .setInitialMax(size)
                 .setStyle(ProgressBarStyle.ASCII)
-                .setMaxRenderedLength(300)
+                .setMaxRenderedLength(200)
+                .showSpeed()
                 .build();
     }
 }

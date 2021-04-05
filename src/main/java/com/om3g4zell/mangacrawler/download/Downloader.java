@@ -1,12 +1,10 @@
 package com.om3g4zell.mangacrawler.download;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.om3g4zell.mangacrawler.entities.Chapter;
 import com.om3g4zell.mangacrawler.entities.Manga;
 import me.tongfei.progressbar.ProgressBar;
-import me.tongfei.progressbar.ProgressBarStyle;
 import org.apache.commons.io.FileUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -23,7 +21,6 @@ import java.net.http.HttpResponse;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -36,13 +33,13 @@ public class Downloader {
     }
 
     private static final Logger logger = LogManager.getLogger(Downloader.class);
-    private static final ObjectMapper objectMapper =  new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    private static final ObjectMapper objectMapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
     private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/537.11";
 
     public static void saveTree(Manga m, Path folderName) throws IOException {
         // TODO mutualise
-        var folderPath =  buildFolderPath(m, folderName);
+        var folderPath = buildFolderPath(m, folderName);
         logger.atInfo()
                 .log("Saving tree to {}", folderPath);
         m = m.withChapters(m.chapters().stream()
@@ -54,7 +51,7 @@ public class Downloader {
         var file = new File(folderPath.toString());
         file.mkdirs();
         var treefile = new File(Path.of(folderPath.toString(), fileName).toString());
-        FileUtils.copyInputStreamToFile(new ByteArrayInputStream(content.getBytes()), treefile );
+        FileUtils.copyInputStreamToFile(new ByteArrayInputStream(content.getBytes()), treefile);
         logger.atInfo()
                 .log("Tree saved");
     }
@@ -67,7 +64,7 @@ public class Downloader {
                 .chapters(new ConcurrentLinkedQueue<>())
                 .url("").build(), folderName);
         var file = new File(Path.of(folderPath.toString(), sanitizePath(mangaName) + ".json").toString());
-        if(file.exists()) {
+        if (file.exists()) {
             try {
                 return objectMapper.readValue(file, Manga.class);
             } catch (IOException e) {
@@ -85,11 +82,11 @@ public class Downloader {
                     atomicInteger.incrementAndGet();
                 })
         );
-        try (ProgressBar pb = new ProgressBar("downloading " + m.name(), atomicInteger.get(), 10, System.out, ProgressBarStyle.ASCII, "", 1, false, null, ChronoUnit.SECONDS, 0L, Duration.ZERO)) {
+        try (ProgressBar pb = PersonalizedProgressBar.progressBar("downloading " + m.name(), atomicInteger.get())) {
             m.chapters().forEach(chapter -> {
                 var chapterFolder = "unknown";
                 var chapterName = sanitizePath(chapter.name());
-                if (chapterName.isBlank() ||chapterName.isEmpty()) {
+                if (chapterName.isBlank() || chapterName.isEmpty()) {
                     chapterFolder = toPrettyString(chapter.number());
                 } else {
                     chapterFolder = String.join("-", toPrettyString(chapter.number()), chapterName);
@@ -115,7 +112,7 @@ public class Downloader {
                             var response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
 
                             FileUtils.copyInputStreamToFile(response.body(), pageFile);
-                            if(isBlank && FileUtils.sizeOf(pageFile) != 0) {
+                            if (isBlank && FileUtils.sizeOf(pageFile) != 0) {
                                 logger.info("Has been fixed !");
                             }
                         }

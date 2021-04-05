@@ -2,16 +2,20 @@ package com.om3g4zell.mangacrawler;
 
 import com.om3g4zell.mangacrawler.download.Downloader;
 import com.om3g4zell.mangacrawler.entities.Chapter;
+import com.om3g4zell.mangacrawler.entities.Manga;
 import com.om3g4zell.mangacrawler.pdf.PdfSaver;
-import com.om3g4zell.mangacrawler.sites.ScanFRCC;
-import com.om3g4zell.mangacrawler.sites.ScanVF;
-import com.om3g4zell.mangacrawler.sites.Site;
+import com.om3g4zell.mangacrawler.sites.*;
 import com.om3g4zell.mangacrawler.sites.exceptions.ThirdPartyCallFailedException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Path;
+import java.util.Map;
 
 public class MangaCrawler {
 
@@ -19,26 +23,32 @@ public class MangaCrawler {
 
     private static final Logger logger = LogManager.getLogger(MangaCrawler.class);
 
-    public static void main(String[] args) throws ThirdPartyCallFailedException, IOException {
-        var site = ScanFRCC.getInstance();
-        updateRoot(ROOT_PATH, site, true, true);
-        //lastChapters(site);
+    public static void main(String[] args) throws ThirdPartyCallFailedException, IOException, InterruptedException {
 
+        var site = LelScanVF.getInstance();
+        getOrUpdateManga(site, "One Punch Man", true, false, ROOT_PATH);
+        //updateRoot(ROOT_PATH, site, true, true);
+        //getOrUpdateManga(site, "Solo Leveling", false, true, ROOT_PATH);
+
+        //PdfSaver.save(Path.of("res/test/test"), 0);
         //updateManga(site, "", false, ROOT_PATH);
     }
 
-    private static void updateManga(Site source, String name, boolean makePdf, Path rootPath) throws IOException {
-        var manga = Downloader.readTree(rootPath, name, source.getUrl());
+    private static void getOrUpdateManga(Site source, String name, boolean downloadImages, boolean makePdf, Path rootPath) throws IOException {
+        var manga = Downloader.readTree(rootPath, name, source.getName());
         if (manga == null) {
-            return;
+            manga = source.getAvailableMangas().get(name);
         }
 
         // Update chapter list
-        manga = source.getChapters(manga);
-        manga = source.getPages(manga);
+        source.getChapters(manga);
+        source.getPages(manga);
 
         Downloader.saveTree(manga, rootPath);
-        Downloader.download(manga, rootPath);
+
+        if(downloadImages) {
+            Downloader.download(manga, rootPath);
+        }
 
         if (makePdf) {
             PdfSaver.save(manga, rootPath, 0);
@@ -87,4 +97,27 @@ public class MangaCrawler {
             }
         });
     }
+
+    public static class fakeSite extends AbstractSite {
+
+        public fakeSite() {
+            super("test", "test.com");
+        }
+
+        @Override
+        public Map<String, Manga> getAvailableMangas() throws ThirdPartyCallFailedException {
+            return null;
+        }
+
+        @Override
+        public Manga getChapters(Manga manga) throws ThirdPartyCallFailedException {
+            return null;
+        }
+
+        @Override
+        public Manga getPages(Manga manga) {
+            return null;
+        }
+    }
+
 }

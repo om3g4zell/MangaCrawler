@@ -1,8 +1,6 @@
 package com.om3g4zell.mangacrawler.pdf;
 
-import com.lowagie.text.Chapter;
-import com.lowagie.text.Document;
-import com.lowagie.text.Image;
+import com.lowagie.text.*;
 import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfWriter;
 import com.om3g4zell.mangacrawler.download.PersonalizedProgressBar;
@@ -40,6 +38,12 @@ public class PdfSaver {
             files.stream().filter(File::isDirectory).sorted(fileComparator())
                     .forEachOrdered(chapterFolder -> {
                         try {
+                            var paragraph = new Paragraph("Chapter : " + chapterFolder.getName(),
+                                    FontFactory.getFont(FontFactory.COURIER_BOLDOBLIQUE, 20));
+                            paragraph.setAlignment(Element.ALIGN_CENTER);
+                            var chapter = new ChapterAutoNumber(paragraph);
+                            chapter.setNumberDepth(0);
+                            pdf.add(chapter);
                             var maybeImages = chapterFolder.listFiles();
                             if (maybeImages == null) {
                                 return;
@@ -93,4 +97,6 @@ public class PdfSaver {
             return Double.compare(f1, f2);
         };
     }
+
+
 }
