@@ -5,19 +5,17 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.om3g4zell.mangacrawler.entities.Chapter;
 import com.om3g4zell.mangacrawler.entities.Manga;
 import me.tongfei.progressbar.ProgressBar;
+import okhttp3.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -36,6 +34,14 @@ public class Downloader {
     private static final ObjectMapper objectMapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
     private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.95 Safari/537.11";
+
+    private static final OkHttpClient client = new OkHttpClient.Builder()
+            .readTimeout(Duration.ofSeconds(30))
+            .connectTimeout(Duration.ofSeconds(30))
+            .followRedirects(true)
+            .retryOnConnectionFailure(true)
+            .build();
+
 
     public static void saveTree(Manga m, Path folderName) throws IOException {
         // TODO mutualise
@@ -95,29 +101,45 @@ public class Downloader {
                 var chapterPath = Paths.get(mangaPath.toString(), chapterFolder);
                 var chapterDirectory = new File(chapterPath.toString());
                 chapterDirectory.mkdirs();
-                chapter.pages().parallelStream().forEach(page -> {
+                chapter.pages().forEach(page -> {
                     try {
                         var url = page.imageUrl();
                         var extension = url.substring(url.lastIndexOf(".") + 1);
                         var pageFile = new File(chapterPath.toString(), toPrettyString(page.number()) + "." + extension);
 
-                        var isBlank = (pageFile.exists() && FileUtils.sizeOf(pageFile) == 0);
-                        if (!pageFile.exists() || isBlank) {
-                            var httpClient = HttpClient.newBuilder()
-                                    .followRedirects(HttpClient.Redirect.ALWAYS)
-                                    .build();
-                            var request = HttpRequest.newBuilder(URI.create(url))
-                                    .GET()
-                                    .build();
-                            var response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+                        if (!pageFile.exists()) {
 
-                            FileUtils.copyInputStreamToFile(response.body(), pageFile);
-                            if (isBlank && FileUtils.sizeOf(pageFile) != 0) {
-                                logger.info("Has been fixed !");
-                            }
+                            var request = new Request.Builder()
+                                    .addHeader("User-Agent", USER_AGENT)
+                                    .url(url)
+                                    .get()
+                                    .build();
+
+                            var call = client.newCall(request);
+                            call.enqueue(new Callback() {
+                                @Override
+                                public void onFailure(@NotNull Call call, @NotNull IOException e) {
+                                    logger.atError()
+                                            .withThrowable(e)
+                                            .log("Couldn't access to {}", page.imageUrl());
+                                }
+
+                                @Override
+                                public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
+                                    var body = response.body();
+
+                                    if (body != null) {
+                                        var stream = body.byteStream();
+                                        FileUtils.copyInputStreamToFile(stream, pageFile);
+                                    }
+                                    pb.step();
+                                }
+                            });
                         }
                         pb.step();
-                        pb.setExtraMessage("Saved " + pageFile.toString());
+                        pb.setExtraMessage("saved " + pageFile.toString());
+
+
                     } catch (Exception e) {
                         logger.atError()
                                 .withThrowable(e)

@@ -26,7 +26,7 @@ public class MangaCrawler {
     public static void main(String[] args) throws ThirdPartyCallFailedException, IOException, InterruptedException {
 
         var site = LelScanVF.getInstance();
-        getOrUpdateManga(site, "One Punch Man", true, false, ROOT_PATH);
+        getOrUpdateManga(site, "Solo Leveling", true, false, ROOT_PATH);
         //updateRoot(ROOT_PATH, site, true, true);
         //getOrUpdateManga(site, "Solo Leveling", false, true, ROOT_PATH);
 
